@@ -12,6 +12,11 @@ import_report:
           device_class: energy
     path:
       description: The path of the CSV file.
-      required: true
+      required: false
+      selector:
+        text:
+    content:
+      description: The CSV content
+      required: false
       selector:
         text:
