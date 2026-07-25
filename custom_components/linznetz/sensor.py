@@ -242,11 +242,11 @@ class LinzNetzSensor(SensorEntity):
         if path is None and content is not None:
             # 2026-07-25 02:30:46.185 DEBUG (MainThread) [custom_components.linznetz] Got content as argument: <MultiDictProxy('file': FileField(name='file', filename='AT0031000000000000000000028134000_QH_20260722.csv', file=<_io.BufferedRandom name=26>, content_type='text/plain', headers=<CIMultiDictProxy('Content-Disposition': 'form-data; name="file"; filename="AT0031000000000000000000028134000_QH_20260722.csv"', 'Content-Type': 'text/plain')>))>
             _LOGGER.debug("Got content as argument: " + content)
-            fp = content["file"]
+            fp = content["data"]["file"]
             _LOGGER.debug(f"{dir(fp)} - {type(fp)}")
             _LOGGER.debug(f"{help(fp)}")
 
-            report_dict_reader = csv.DictReader(fp, delimiter=";")
+            report_dict_reader = csv.DictReader(fp.file, delimiter=";")
             csv_data = list(report_dict_reader)
 
         elif content is None and path is not None:
