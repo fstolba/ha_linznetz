@@ -53,7 +53,8 @@ async def async_setup_entry(
     platform.async_register_entity_service(
         SERVICE_IMPORT_REPORT,
         {
-            vol.Required("path"): str,
+            "path": str,
+            "content": str,
         },
         LinzNetzSensor.import_report.__name__,
     )
@@ -225,9 +226,11 @@ class LinzNetzSensor(SensorEntity):
         except Exception:
             _LOGGER.exception("Unexpected error during auto-fetch from LinzNetz")
 
-    async def import_report(self, path: str) -> None:
+    async def import_report(self, path: str = None, content: str = None) -> None:
         """Service to import csv data from path."""
         _LOGGER.debug("Import Report executed with path: %s", path)
+        _LOGGER.debug("Import Report executed with content: %s", content)
+
         _LOGGER.debug(
             "Entity: %s; Entity_ID: %s; Unique_ID: %s",
             self.name,
@@ -235,7 +238,12 @@ class LinzNetzSensor(SensorEntity):
             self.unique_id,
         )
 
-        csv_data = get_csv_data_list_from_file(path)
+        if path is None and content is not None:
+            csv_data = content
+            _LOGGER.debug("Got content as argument: " + content)
+
+        else:
+            csv_data = get_csv_data_list_from_file(path)
 
         if len(csv_data) % 4 != 0:
             raise HomeAssistantError(
