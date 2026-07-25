@@ -55,7 +55,7 @@ async def async_setup_entry(
         SERVICE_IMPORT_REPORT,
         {
             vol.Optional("path"): str,
-            vol.Optional("content"): FileField,
+            vol.Optional("content"): set(),
         },
         LinzNetzSensor.import_report.__name__,
     )
@@ -227,10 +227,12 @@ class LinzNetzSensor(SensorEntity):
         except Exception:
             _LOGGER.exception("Unexpected error during auto-fetch from LinzNetz")
 
-    async def import_report(self, path: str = None, content: FileField = None) -> None:
+    async def import_report(self, path = None, content = None):
         """Service to import csv data from path."""
         _LOGGER.debug("Import Report executed with path: %s", path)
         _LOGGER.debug("Import Report executed with content: %s", content)
+        _LOGGER.debug(f"Content is of type {type(content)}")
+
         _LOGGER.debug(
             "Entity: %s; Entity_ID: %s; Unique_ID: %s",
             self.name,
