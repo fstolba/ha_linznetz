@@ -54,8 +54,8 @@ async def async_setup_entry(
     platform.async_register_entity_service(
         SERVICE_IMPORT_REPORT,
         {
-            vol.Optional("path"): vol.Any(None, str),
-            vol.Optional("content"): vol.Any(None, FileField),
+            vol.Optional("path"): str,
+            vol.Optional("content"): FileField,
         },
         LinzNetzSensor.import_report.__name__,
     )
