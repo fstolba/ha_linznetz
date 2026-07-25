@@ -6,6 +6,7 @@ from decimal import Decimal
 import logging
 import os
 import voluptuous as vol
+from aiohttp.web_request import FileField
 
 from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.models import StatisticData, StatisticMeanType, StatisticMetaData
@@ -54,7 +55,7 @@ async def async_setup_entry(
         SERVICE_IMPORT_REPORT,
         {
             "path": str,
-            "content": str,
+            "content": FileField,
         },
         LinzNetzSensor.import_report.__name__,
     )
@@ -226,11 +227,10 @@ class LinzNetzSensor(SensorEntity):
         except Exception:
             _LOGGER.exception("Unexpected error during auto-fetch from LinzNetz")
 
-    async def import_report(self, path: str = None, content: str = None) -> None:
+    async def import_report(self, path: str = None, content: FileField = None) -> None:
         """Service to import csv data from path."""
         _LOGGER.debug("Import Report executed with path: %s", path)
         _LOGGER.debug("Import Report executed with content: %s", content)
-
         _LOGGER.debug(
             "Entity: %s; Entity_ID: %s; Unique_ID: %s",
             self.name,
@@ -240,13 +240,7 @@ class LinzNetzSensor(SensorEntity):
 
 
         if path is None and content is not None:
-            # 2026-07-25 02:30:46.185 DEBUG (MainThread) [custom_components.linznetz] Got content as argument: <MultiDictProxy('file': FileField(name='file', filename='AT0031000000000000000000028134000_QH_20260722.csv', file=<_io.BufferedRandom name=26>, content_type='text/plain', headers=<CIMultiDictProxy('Content-Disposition': 'form-data; name="file"; filename="AT0031000000000000000000028134000_QH_20260722.csv"', 'Content-Type': 'text/plain')>))>
-            _LOGGER.debug("Got content as argument: " + content)
-            fp = content["data"]["file"]
-            _LOGGER.debug(f"{dir(fp)} - {type(fp)}")
-            _LOGGER.debug(f"{help(fp)}")
-
-            report_dict_reader = csv.DictReader(fp.file, delimiter=";")
+            report_dict_reader = csv.DictReader(content.file, delimiter=";")
             csv_data = list(report_dict_reader)
 
         elif content is None and path is not None:
