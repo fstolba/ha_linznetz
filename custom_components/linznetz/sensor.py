@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 import logging
 import os
-import voluptuous as vol
+import voluptuous as vol, Any
 from aiohttp.web_request import FileField
 
 from homeassistant.components.recorder import get_instance
@@ -54,8 +54,8 @@ async def async_setup_entry(
     platform.async_register_entity_service(
         SERVICE_IMPORT_REPORT,
         {
-            "path": str,
-            "content": FileField,
+            vol.Optional("path"): Any(None, str),
+            vol.Optional("content"): Any(None, FileField),
         },
         LinzNetzSensor.import_report.__name__,
     )
