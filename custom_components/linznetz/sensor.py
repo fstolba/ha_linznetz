@@ -1,6 +1,7 @@
 """Sensor platform for linznetz."""
 
 import csv
+import io
 from datetime import datetime, timedelta
 from decimal import Decimal
 import logging
@@ -8,6 +9,7 @@ import os
 import voluptuous as vol
 from aiohttp.web_request import FileField
 
+from homeassistant.components import webhook
 from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.models import StatisticData, StatisticMeanType, StatisticMetaData
 from homeassistant.components.recorder.statistics import (
@@ -40,6 +42,10 @@ from .const import (
     SERVICE_IMPORT_REPORT,
     END_TIME_KEY,
     START_TIME_KEY,
+    CONF_WEBHOOK_ID,
+ATTR_METER_POINT_NUMBER,
+ATTR_WEBHOOK_URL,
+ATTR_WEBHOOK_LAST_RECEIVED,
 )
 
 _LOGGER: logging.Logger = logging.getLogger(__package__)
@@ -62,6 +68,18 @@ async def async_setup_entry(
 
     client = hass.data[DOMAIN][config_entry.entry_id].get("client")
     async_add_devices([LinzNetzSensor(config_entry, client)])
+
+
+async def async_setup_platform(
+    hass: HomeAssistantType,
+    config: ConfigType,
+    async_add_entities: Callable,
+    discovery_info: Optional[DiscoveryInfoType] = None,
+) -> None:
+    """Set up the sensor platform."""
+    github = GitHubAPI(session, "requester", oauth_token=config[CONF_ACCESS_TOKEN])
+    sensors = [GitHubRepoSensor(github, repo) for repo in config[CONF_REPOS]]
+    async_add_entities(sensors, update_before_add=True)
 
 
 def get_csv_data_value_key(csv_data: list) -> str:
@@ -124,13 +142,15 @@ def validate_hour_block(hour_block: list) -> bool:
 
 class LinzNetzSensor(SensorEntity):
     """linznetz Sensor class."""
+    _attr_last_webhook_receive: datetime | None = None
+    _attr_has_entity_name = True
+    _attr_name = None
 
     def __init__(self, config_entry: ConfigEntry, client: LinzNetzApiClient | None = None):
         """Initialize the sensor."""
         self.config_entry = config_entry
         self._client = client
         self._meter_point_number = config_entry.data[CONF_METER_POINT_NUMBER]
-        _name = config_entry.data.get(CONF_NAME, DEFAULT_NAME)
         self._attr_name = f"{_name} Energy"
 
         self._attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
@@ -144,40 +164,64 @@ class LinzNetzSensor(SensorEntity):
             identifiers={(DOMAIN, self._meter_point_number)}, name=_name
         )
         self._attr_unique_id = f"{self._meter_point_number}_energy"
+
         self._unsub_timer: CALLBACK_TYPE | None = None
         self._last_fetch_date: datetime | None = None
+
+        meter_partial = user_input[CONF_METER_POINT_NUMBER][-8:]
+        self._webhook_id = f"linznetz{meter_partial}"
+
+
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added to hass."""
         await super().async_added_to_hass()
-        if self._client:
-            # Schedule periodic automatic data fetching
-            self._unsub_timer = async_track_time_interval(
-                self.hass,
-                self._async_auto_fetch,
-                timedelta(hours=DEFAULT_UPDATE_INTERVAL_HOURS),
-            )
-            _LOGGER.debug(
-                "Scheduled automatic data fetching every %d hours",
-                DEFAULT_UPDATE_INTERVAL_HOURS,
-            )
-            # Do an initial fetch after a short delay to let HA fully start
-            self.hass.async_create_task(self._async_initial_fetch())
+
+        self.hass.custom_attributes = {
+            ATTR_METER_POINT_NUMBER: self._meter_point_number,
+        }
+
+        # Registering the Webhook receiver so we can access it's data without HA type casting
+        webhook.async_register(
+            self.hass,
+            DOMAIN,
+            f"Linznetz {self._meter_point_number} webhook receiver",
+            self._webhook_id,
+            self.handle_file_webhook
+        )
+        url = webhook.async_generate_url(self.hass, self._webhook_id)
+        self.hass.custom_attributes[ATTR_WEBHOOK_URL] = url
+        _LOGGER.info(f"Webhook endpoint available at {url}.")
+
+    async def handle_file_webhook(self, hass, webhook_id, request):
+        """Directly process the incoming multipart form-data."""
+        data = await request.post()
+
+        _LOGGER.debug(f"Webhook received, payload {data}")
+        file_field = data.get("file")
+
+        if not file_field:
+            _LOGGER.error("No file found in webhook form-data.")
+            return
+
+        self.hass.custom_attributes[ATTR_WEBHOOK_LAST_RECEIVED] = dt_util.utcnow()
+        self._attr_last_webhook_receive = dt_util.utcnow()
+        await self.import_report(None, file_field.file)
+
+    @property
+    def last_webhook_receive(self):
+        """Return the translation key to translate the entity's name and states."""
+        return self._attr_last_webhook_receive
 
     async def async_will_remove_from_hass(self) -> None:
         """Run when entity will be removed from hass."""
         if self._unsub_timer:
             self._unsub_timer()
             self._unsub_timer = None
+        webhook.async_unregister(self.hass, self._webhook_id)
         await super().async_will_remove_from_hass()
 
-    async def _async_initial_fetch(self) -> None:
-        """Perform the initial data fetch after a short delay."""
-        # Wait a bit for HA to fully initialize
-        await self.hass.async_add_executor_job(lambda: None)
-        await self._async_auto_fetch(None)
-
-    async def _async_auto_fetch(self, _now) -> None:
+    async def async_update(self) -> None:
         """Automatically fetch and import data from LinzNetz portal."""
         if not self._client:
             return
@@ -227,6 +271,14 @@ class LinzNetzSensor(SensorEntity):
         except Exception:
             _LOGGER.exception("Unexpected error during auto-fetch from LinzNetz")
 
+    @property
+    def device_state_attributes(self):
+        return self.hass.custom_attributes
+
+    @property
+    def extra_state_attributes(self):
+        return self.device_state_attributes
+
     async def import_report(self, path = None, content = None):
         """Service to import csv data from path."""
         _LOGGER.debug("Import Report executed with path: %s", path)
@@ -242,7 +294,7 @@ class LinzNetzSensor(SensorEntity):
 
 
         if path is None and content is not None:
-            report_dict_reader = csv.DictReader(content.file, delimiter=";")
+            report_dict_reader = csv.DictReader(io.TextIOWrapper(content, encoding="utf-8"), delimiter=";")
             csv_data = list(report_dict_reader)
 
         elif content is None and path is not None:

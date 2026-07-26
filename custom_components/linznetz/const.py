@@ -19,6 +19,12 @@ CONF_METER_POINT_NUMBER = "meter_point_number"
 CONF_NAME = "name"
 CONF_USERNAME = "username"
 CONF_PASSWORD = "password"
+CONF_WEBHOOK_ID = "webhook_id"
+CONF_WEBHOOK_URL = "webhook_url"
 
 # Update interval in hours for automatic data fetching
 DEFAULT_UPDATE_INTERVAL_HOURS = 6
+
+ATTR_METER_POINT_NUMBER = "Zaehlerpunktnummer"
+ATTR_WEBHOOK_URL = "Webhook URL"
+ATTR_WEBHOOK_LAST_RECEIVED = "Webhook last received timestamp"

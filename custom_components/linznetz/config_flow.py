@@ -2,6 +2,7 @@
 import logging
 
 from homeassistant import config_entries
+from homeassistant.components import webhook
 
 import voluptuous as vol
 
