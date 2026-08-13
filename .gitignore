@@ -11,7 +11,8 @@ __pycache__
 .vscode
 coverage.xml
 .ruff_cache
-,idea/
+,ideagit push
+
 
 # Home Assistant configuration
 config/*
