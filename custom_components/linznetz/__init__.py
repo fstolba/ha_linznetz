@@ -6,6 +6,7 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.components import webhook
 
 from .api import LinzNetzApiClient
 from .const import (
@@ -13,13 +14,13 @@ from .const import (
     CONF_USERNAME,
     DOMAIN,
     PLATFORMS,
+    CONF_METER_POINT_NUMBER,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup(_hass: HomeAssistant, _config: ConfigType):
-    """Set up this integration using YAML is not supported."""
     return True
 
 
@@ -41,7 +42,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id] = {
         "client": client,
     }
-
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True
