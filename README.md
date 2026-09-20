@@ -81,6 +81,8 @@ The relevant code paths were left untouched during the latest round of modificat
 Each device will register a Webhook Endpoint, yielding one endpoint per Zählerpunktnummer. This Webhook will accept a file attachment as formdata and run the import routine on this file.
 This will be useful if you have some sort of Email processing already in place, e.g. via Paperless-ngx.
 
+To retrieve the Webhook URL, either check the Integration's logs or the Energy Sensor's attributes.
+
 ### Manual CSV Import
 
 You can still use the manual `linznetz.import_report` service to import CSV files. This is useful for:

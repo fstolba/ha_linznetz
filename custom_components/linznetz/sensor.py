@@ -16,6 +16,7 @@ from homeassistant.components.recorder.statistics import (
     get_last_statistics,
     async_import_statistics,
     statistics_during_period,
+    async_add_external_statistics,
 )
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -412,4 +413,5 @@ class LinzNetzSensor(SensorEntity):
             )
         _LOGGER.debug(statistics)
         _LOGGER.debug(metadata)
-        async_import_statistics(self.hass, metadata, statistics)
+        #async_import_statistics(self.hass, metadata, statistics)
+        async_add_external_statistics(self.hass, metadata, statistics)
